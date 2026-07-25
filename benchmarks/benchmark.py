@@ -915,6 +915,18 @@ class Benchmark(unittest.TestCase):
         self.t_primes_dict = t_primes_dict
         self.var_ts_dict = var_ts_dict
 
+        # Throughput is derived from the sum of per-query latencies (the
+        # simulated/live model latency each request actually incurred),
+        # rather than the wall-clock time of the benchmark loop. The loop's
+        # wall-clock time is dominated by harness overhead (dataset
+        # iteration, pandas/tqdm bookkeeping, the inter-iteration sleep) and
+        # does not reflect real request throughput, especially for
+        # pre-computed datasets where model latency is injected rather than
+        # actually elapsed.
+        simulated_time_sec = (
+            sum(self.latency_vcache_list) if self.latency_vcache_list else None
+        )
+
         try:
             global_observations_dict = self.vcache.vcache_policy.global_observations
             global_gamma = self.vcache.vcache_policy.bayesian.global_gamma
@@ -951,15 +963,14 @@ class Benchmark(unittest.TestCase):
             "peak_memory_mb": max(self.memory_mb_list) if self.memory_mb_list else None,
             "gpu_util_list": self.gpu_util_list,
             "elapsed_time_sec": self.elapsed_time_sec,
+            "simulated_time_sec": simulated_time_sec,
             "throughput_qps": (
-                len(self.cache_hit_list) / self.elapsed_time_sec
-                if self.elapsed_time_sec
+                len(self.cache_hit_list) / simulated_time_sec
+                if simulated_time_sec
                 else None
             ),
             "throughput_tps": (
-                self._total_tokens / self.elapsed_time_sec
-                if self.elapsed_time_sec
-                else None
+                self._total_tokens / simulated_time_sec if simulated_time_sec else None
             ),
             "observations_dict": self.observations_dict,
             "gammas_dict": self.gammas_dict,

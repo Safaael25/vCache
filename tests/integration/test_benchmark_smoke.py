@@ -105,6 +105,11 @@ class TestBenchmarkSmoke(unittest.TestCase):
         self.benchmark.stats_set_up()
 
     def tearDown(self):
+        # `stats_set_up`/`setUp` start a `VerifiedDecisionPolicy`, which owns
+        # its own ThreadPoolExecutor and CallbackQueue worker thread
+        # (separate from the eviction policy's executor below). Both must be
+        # shut down explicitly or the background threads leak past the test.
+        self.benchmark.vcache.vcache_policy.shutdown()
         self.eviction_policy.shutdown()
         shutil.rmtree(self.output_dir, ignore_errors=True)
 
@@ -123,6 +128,19 @@ class TestBenchmarkSmoke(unittest.TestCase):
         self.assertIsNotNone(self.benchmark.elapsed_time_sec)
         self.assertGreater(self.benchmark.elapsed_time_sec, 0.0)
 
+        # Snapshot the in-memory lists before dumping, so the dumped
+        # JSON/CSV values can be checked against the exact numbers that
+        # produced them, not just their presence/shape.
+        expected_cpu_percent_list = list(self.benchmark.cpu_percent_list)
+        expected_memory_mb_list = list(self.benchmark.memory_mb_list)
+        expected_gpu_util_list = list(self.benchmark.gpu_util_list)
+        expected_latency_vcache_list = list(self.benchmark.latency_vcache_list)
+        expected_total_tokens = self.benchmark._total_tokens
+        expected_peak_memory_mb = max(expected_memory_mb_list)
+        expected_simulated_time_sec = sum(expected_latency_vcache_list)
+        expected_throughput_qps = NUM_SAMPLES / expected_simulated_time_sec
+        expected_throughput_tps = expected_total_tokens / expected_simulated_time_sec
+
         self.benchmark.dump_results_to_json()
         self.benchmark.dump_results_to_csv()
 
@@ -130,18 +148,26 @@ class TestBenchmarkSmoke(unittest.TestCase):
         with open(json_path) as f:
             data = json.load(f)
 
-        self.assertEqual(len(data["cpu_percent_list"]), NUM_SAMPLES)
-        self.assertEqual(len(data["memory_mb_list"]), NUM_SAMPLES)
-        self.assertEqual(len(data["gpu_util_list"]), NUM_SAMPLES)
-        self.assertIsInstance(data["peak_memory_mb"], float)
-        self.assertGreater(data["throughput_qps"], 0.0)
-        self.assertGreaterEqual(data["throughput_tps"], 0.0)
+        self.assertEqual(data["cpu_percent_list"], expected_cpu_percent_list)
+        self.assertEqual(data["memory_mb_list"], expected_memory_mb_list)
+        self.assertEqual(data["gpu_util_list"], expected_gpu_util_list)
+        self.assertEqual(data["peak_memory_mb"], expected_peak_memory_mb)
+        self.assertAlmostEqual(data["simulated_time_sec"], expected_simulated_time_sec)
+        self.assertAlmostEqual(data["throughput_qps"], expected_throughput_qps)
+        self.assertAlmostEqual(data["throughput_tps"], expected_throughput_tps)
 
         csv_path = f"{self.output_dir}/results_smoketest.csv"
         df = pd.read_csv(csv_path)
         self.assertEqual(len(df), NUM_SAMPLES)
-        for column in ("cpu_percent", "memory_mb", "gpu_util_percent"):
-            self.assertIn(column, df.columns)
+        self.assertEqual(df["cpu_percent"].tolist(), expected_cpu_percent_list)
+        self.assertEqual(df["memory_mb"].tolist(), expected_memory_mb_list)
+        for expected, actual in zip(
+            expected_gpu_util_list, df["gpu_util_percent"].tolist()
+        ):
+            if expected is None:
+                self.assertTrue(pd.isna(actual))
+            else:
+                self.assertEqual(actual, expected)
 
 
 if __name__ == "__main__":

@@ -1,9 +1,11 @@
+import atexit
 import os
 from typing import Optional
 
 import psutil
 
 _gpu_unavailable: bool = False
+_gpu_handle = None
 _token_encoding = None
 _tiktoken_unavailable: bool = False
 
@@ -34,22 +36,41 @@ def gpu_utilization_percent() -> Optional[float]:
     unavailable, it is assumed to stay unavailable for the process lifetime
     so we don't re-probe on every call.
 
+    NVML is initialized at most once per process (cached handle) and torn
+    down via `atexit` rather than being re-initialized on every call.
+
     Returns:
         The utilization of GPU device 0 in percent, or None if unavailable.
     """
-    global _gpu_unavailable
+    global _gpu_unavailable, _gpu_handle
     if _gpu_unavailable:
         return None
 
     try:
         import pynvml
 
-        pynvml.nvmlInit()
-        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-        return float(pynvml.nvmlDeviceGetUtilizationRates(handle).gpu)
+        if _gpu_handle is None:
+            pynvml.nvmlInit()
+            atexit.register(_shutdown_nvml)
+            _gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        return float(pynvml.nvmlDeviceGetUtilizationRates(_gpu_handle).gpu)
     except Exception:
         _gpu_unavailable = True
         return None
+
+
+def _shutdown_nvml() -> None:
+    """Shuts down NVML if it was initialized by `gpu_utilization_percent`."""
+    global _gpu_handle
+    if _gpu_handle is None:
+        return
+    try:
+        import pynvml
+
+        pynvml.nvmlShutdown()
+    except Exception:
+        pass
+    _gpu_handle = None
 
 
 def count_tokens(text: str) -> int:
