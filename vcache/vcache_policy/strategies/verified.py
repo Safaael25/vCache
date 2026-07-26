@@ -244,9 +244,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
             )
         except Exception:
             # Cache eviction fallback
-            new_response, cost = self._generate_and_measure_cost(
-                prompt, system_prompt
-            )
+            new_response, cost = self._generate_and_measure_cost(prompt, system_prompt)
             self.cache.add(
                 prompt=prompt, response=new_response, id_set=id_set, cost=cost
             )
@@ -264,9 +262,7 @@ class VerifiedDecisionPolicy(VCachePolicy):
             case _Action.EXPLOIT:
                 return True, nn_metadata.response, nn_metadata
             case _Action.EXPLORE:
-                response, cost = self._generate_and_measure_cost(
-                    prompt, system_prompt
-                )
+                response, cost = self._generate_and_measure_cost(prompt, system_prompt)
 
                 self.__update_cache(
                     response=response,
