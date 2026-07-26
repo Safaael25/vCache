@@ -94,6 +94,10 @@ from vcache.vcache_core.cache.embedding_store.vector_db import (
     SimilarityMetricType,
 )
 from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPolicy
+from vcache.vcache_core.cache.eviction_policy.strategies.cost_aware import (
+    CostAwareEvictionPolicy,
+)
+from vcache.vcache_core.cache.eviction_policy.strategies.lru import LRUEvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.mru import MRUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
@@ -326,6 +330,35 @@ RUN_COMBINATIONS: List[
         MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         27500,
     ),
+    # Eviction policy comparison: CostAwareEvictionPolicy vs. LRUEvictionPolicy.
+    # LRU (not MRU) is the correct baseline here: per CostAwareEvictionPolicy's
+    # own docs, it reduces to plain LRU at cost_weight=0, so comparing against
+    # LRU isolates exactly what the cost-weighting term adds. Same
+    # dataset/model/sample count, differing only in eviction policy, so any
+    # metric delta between the two runs is attributable to that one variable.
+    # `max_size` is set well below `max_samples` (unlike the combinations
+    # above, where the cache never fills up) so eviction actually triggers
+    # repeatedly during the run.
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        CostAwareEvictionPolicy(
+            max_size=300, watermark=0.9, eviction_percentage=0.1, cost_weight=0.5
+        ),
+        3000,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        LRUEvictionPolicy(max_size=300, watermark=0.9, eviction_percentage=0.1),
+        3000,
+    ),
 ]
 
 BASELINES_TO_RUN: List[Baseline] = [
@@ -556,6 +589,7 @@ class Benchmark(unittest.TestCase):
                 label_response=label_response,
                 system_prompt=system_prompt,
                 id_set=label_id_set,
+                cost=llm_generation_latency,
             )
             latency_vcache: float = latency_vcache_logic + emb_generation_latency
             if not is_cache_hit:
@@ -748,6 +782,7 @@ class Benchmark(unittest.TestCase):
         label_response: str,
         system_prompt: str,
         id_set: int,
+        cost: float = None,
     ) -> Tuple[bool, str, EmbeddingMetadataObj, EmbeddingMetadataObj, float]:
         """Get vCache response for pre-computed datasets with embedding injection.
 
@@ -761,6 +796,12 @@ class Benchmark(unittest.TestCase):
             label_response: Ground truth response to inject into inference engine.
             system_prompt: System prompt for structured outputs.
             id_set: ID set for the prompt (used for correctness evaluation).
+            cost: The dataset's recorded LLM generation latency for this
+                prompt, in seconds. `BenchmarkInferenceEngine.create()`
+                returns the pre-set response instantly, so on a cache miss
+                a wall-clock cost measurement would be near-zero regardless
+                of this value; passing it through lets cost-aware eviction
+                policies see the real, dataset-recorded generation cost.
 
         Returns:
             Tuple containing:
@@ -797,7 +838,9 @@ class Benchmark(unittest.TestCase):
         self.vcache.vcache_config.embedding_engine.set_next_embedding(
             candidate_embedding
         )
-        self.vcache.vcache_config.inference_engine.set_next_response(label_response)
+        self.vcache.vcache_config.inference_engine.set_next_response(
+            label_response, cost=cost
+        )
 
         latency_vcache_logic: float = time.time()
         try:
@@ -871,6 +914,25 @@ class Benchmark(unittest.TestCase):
             latency_vcache_logic,
         )
 
+    @staticmethod
+    def _latency_stats(latencies: List[float]) -> Dict[str, float]:
+        """Computes mean/p95/p99 for a list of per-query latencies.
+
+        Args:
+            latencies: Per-query latency measurements, in seconds.
+
+        Returns:
+            Dict with "mean", "p95", and "p99" keys. All values are None if
+            `latencies` is empty.
+        """
+        if not latencies:
+            return {"mean": None, "p95": None, "p99": None}
+        return {
+            "mean": float(np.mean(latencies)),
+            "p95": float(np.percentile(latencies, 95)),
+            "p99": float(np.percentile(latencies, 99)),
+        }
+
     def dump_results_to_json(self):
         """Serialize benchmark results to JSON file.
 
@@ -927,6 +989,9 @@ class Benchmark(unittest.TestCase):
             sum(self.latency_vcache_list) if self.latency_vcache_list else None
         )
 
+        latency_vcache_stats = self._latency_stats(self.latency_vcache_list)
+        latency_direct_stats = self._latency_stats(self.latency_direct_list)
+
         try:
             global_observations_dict = self.vcache.vcache_policy.global_observations
             global_gamma = self.vcache.vcache_policy.bayesian.global_gamma
@@ -952,12 +1017,23 @@ class Benchmark(unittest.TestCase):
             },
             "cache_hit_list": self.cache_hit_list,
             "cache_miss_list": self.cache_miss_list,
+            "hit_rate": (
+                sum(self.cache_hit_list) / len(self.cache_hit_list)
+                if self.cache_hit_list
+                else None
+            ),
             "tp_list": self.tp_list,
             "fp_list": self.fp_list,
             "tn_list": self.tn_list,
             "fn_list": self.fn_list,
             "latency_direct_list": self.latency_direct_list,
             "latency_vectorq_list": self.latency_vcache_list,
+            "latency_vcache_mean_sec": latency_vcache_stats["mean"],
+            "latency_vcache_p95_sec": latency_vcache_stats["p95"],
+            "latency_vcache_p99_sec": latency_vcache_stats["p99"],
+            "latency_direct_mean_sec": latency_direct_stats["mean"],
+            "latency_direct_p95_sec": latency_direct_stats["p95"],
+            "latency_direct_p99_sec": latency_direct_stats["p99"],
             "cpu_percent_list": self.cpu_percent_list,
             "memory_mb_list": self.memory_mb_list,
             "peak_memory_mb": max(self.memory_mb_list) if self.memory_mb_list else None,
