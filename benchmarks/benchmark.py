@@ -97,8 +97,10 @@ from vcache.vcache_core.cache.eviction_policy.eviction_policy import EvictionPol
 from vcache.vcache_core.cache.eviction_policy.strategies.cost_aware import (
     CostAwareEvictionPolicy,
 )
+from vcache.vcache_core.cache.eviction_policy.strategies.fifo import FIFOEvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.lru import LRUEvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.mru import MRUEvictionPolicy
+from vcache.vcache_core.cache.eviction_policy.strategies.scu import SCUEvictionPolicy
 from vcache.vcache_core.similarity_evaluator import SimilarityEvaluator
 from vcache.vcache_core.similarity_evaluator.strategies.benchmark_comparison import (
     BenchmarkComparisonSimilarityEvaluator,
@@ -330,15 +332,16 @@ RUN_COMBINATIONS: List[
         MRUEvictionPolicy(max_size=100000, watermark=0.99, eviction_percentage=0.1),
         27500,
     ),
-    # Eviction policy comparison: CostAwareEvictionPolicy vs. LRUEvictionPolicy.
-    # LRU (not MRU) is the correct baseline here: per CostAwareEvictionPolicy's
-    # own docs, it reduces to plain LRU at cost_weight=0, so comparing against
-    # LRU isolates exactly what the cost-weighting term adds. Same
-    # dataset/model/sample count, differing only in eviction policy, so any
-    # metric delta between the two runs is attributable to that one variable.
-    # `max_size` is set well below `max_samples` (unlike the combinations
-    # above, where the cache never fills up) so eviction actually triggers
-    # repeatedly during the run.
+    # Eviction policy comparison: CostAwareEvictionPolicy against every other
+    # eviction strategy in the codebase (LRU, MRU, FIFO, SCU). Same
+    # dataset/model/sample count across all five entries, differing only in
+    # eviction policy, so any metric delta is attributable to that one
+    # variable. `max_size` is set well below `max_samples` (unlike the
+    # combinations above, where the cache never fills up) so eviction
+    # actually triggers repeatedly during the run. LRU is the most important
+    # of these baselines: per CostAwareEvictionPolicy's own docs, it reduces
+    # to plain LRU at cost_weight=0, so that comparison isolates exactly what
+    # the cost-weighting term adds.
     (
         EmbeddingModel.E5_LARGE_V2,
         LargeLanguageModel.GPT_4O_MINI,
@@ -357,6 +360,37 @@ RUN_COMBINATIONS: List[
         GeneratePlotsOnly.NO,
         BenchmarkComparisonSimilarityEvaluator(),
         LRUEvictionPolicy(max_size=300, watermark=0.9, eviction_percentage=0.1),
+        3000,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        MRUEvictionPolicy(max_size=300, watermark=0.9, eviction_percentage=0.1),
+        3000,
+    ),
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        FIFOEvictionPolicy(max_size=300, watermark=0.9, eviction_percentage=0.1),
+        3000,
+    ),
+    # SCU is only meaningful paired with the VCacheLocal baseline (it reads
+    # VerifiedDecisionPolicy-specific metadata and falls back to plain LRU
+    # otherwise), but is included here for the same fixed max_size/dataset
+    # so it's available for comparison too.
+    (
+        EmbeddingModel.E5_LARGE_V2,
+        LargeLanguageModel.GPT_4O_MINI,
+        Dataset.SEM_BENCHMARK_ARENA,
+        GeneratePlotsOnly.NO,
+        BenchmarkComparisonSimilarityEvaluator(),
+        SCUEvictionPolicy(max_size=300, watermark=0.9, eviction_percentage=0.1),
         3000,
     ),
 ]
