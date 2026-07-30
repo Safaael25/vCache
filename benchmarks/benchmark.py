@@ -380,10 +380,6 @@ RUN_COMBINATIONS: List[
         FIFOEvictionPolicy(max_size=300, watermark=0.9, eviction_percentage=0.1),
         3000,
     ),
-    # SCU is only meaningful paired with the VCacheLocal baseline (it reads
-    # VerifiedDecisionPolicy-specific metadata and falls back to plain LRU
-    # otherwise), but is included here for the same fixed max_size/dataset
-    # so it's available for comparison too.
     (
         EmbeddingModel.E5_LARGE_V2,
         LargeLanguageModel.GPT_4O_MINI,
@@ -1011,14 +1007,6 @@ class Benchmark(unittest.TestCase):
         self.t_primes_dict = t_primes_dict
         self.var_ts_dict = var_ts_dict
 
-        # Throughput is derived from the sum of per-query latencies (the
-        # simulated/live model latency each request actually incurred),
-        # rather than the wall-clock time of the benchmark loop. The loop's
-        # wall-clock time is dominated by harness overhead (dataset
-        # iteration, pandas/tqdm bookkeeping, the inter-iteration sleep) and
-        # does not reflect real request throughput, especially for
-        # pre-computed datasets where model latency is injected rather than
-        # actually elapsed.
         simulated_time_sec = (
             sum(self.latency_vcache_list) if self.latency_vcache_list else None
         )
