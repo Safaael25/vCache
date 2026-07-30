@@ -1,5 +1,9 @@
-from typing import List
+from typing import List, Optional
 
+from vcache.vcache_core.cache.admission_policy.admission_policy import AdmissionPolicy
+from vcache.vcache_core.cache.admission_policy.strategies.always_admit import (
+    AlwaysAdmitPolicy,
+)
 from vcache.vcache_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_obj import (
     EmbeddingMetadataObj,
@@ -18,6 +22,7 @@ class Cache:
         embedding_store: EmbeddingStore,
         embedding_engine: EmbeddingEngine,
         eviction_policy: EvictionPolicy,
+        admission_policy: Optional[AdmissionPolicy] = None,
     ):
         """Initializes cache with embedding store, engine, and eviction policy.
 
@@ -25,13 +30,19 @@ class Cache:
             embedding_store (EmbeddingStore): Store for managing embeddings and metadata.
             embedding_engine (EmbeddingEngine): Engine for generating embeddings from text.
             eviction_policy (EvictionPolicy): Policy for removing items when cache is full.
+            admission_policy (Optional[AdmissionPolicy]): Policy for deciding whether
+                a cache-miss item is worth caching before it takes up a slot. Defaults
+                to `AlwaysAdmitPolicy`, which preserves vCache's original behavior of
+                admitting every miss.
         """
         self.embedding_store: EmbeddingStore = embedding_store
         self.embedding_engine: EmbeddingEngine = embedding_engine
         self.eviction_policy: EvictionPolicy = eviction_policy
+        self.admission_policy: AdmissionPolicy = admission_policy or AlwaysAdmitPolicy()
 
     def add(self, prompt: str, response: str, id_set: int, cost: float = None) -> int:
-        """Computes and adds an embedding to the vector database and metadata store.
+        """Computes an embedding and, if admitted, adds it to the vector database
+        and metadata store.
 
         Note:
             The embedding is computed first, then added to the vector database,
@@ -48,9 +59,12 @@ class Cache:
                 to generate the response. Used by cost-aware eviction policies.
 
         Returns:
-            int: The ID of the newly added embedding.
+            int: The ID of the newly added embedding, or -1 if the admission
+            policy declined to cache it.
         """
         embedding = self.embedding_engine.get_embedding(prompt)
+        if not self.admission_policy.should_admit(embedding):
+            return -1
         return self.embedding_store.add_embedding(embedding, response, id_set, cost)
 
     def remove(self, embedding_id: int) -> int:

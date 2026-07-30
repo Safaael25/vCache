@@ -2,6 +2,10 @@ from typing import Optional
 
 from vcache.inference_engine.inference_engine import InferenceEngine
 from vcache.inference_engine.strategies.open_ai import OpenAIInferenceEngine
+from vcache.vcache_core.cache.admission_policy.admission_policy import AdmissionPolicy
+from vcache.vcache_core.cache.admission_policy.strategies.always_admit import (
+    AlwaysAdmitPolicy,
+)
 from vcache.vcache_core.cache.embedding_engine import OpenAIEmbeddingEngine
 from vcache.vcache_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
 from vcache.vcache_core.cache.embedding_store.embedding_metadata_storage.embedding_metadata_storage import (
@@ -38,6 +42,7 @@ class VCacheConfig:
         vector_db: VectorDB = HNSWLibVectorDB(),
         embedding_metadata_storage: EmbeddingMetadataStorage = InMemoryEmbeddingMetadataStorage(),
         eviction_policy: EvictionPolicy = NoEvictionPolicy(),
+        admission_policy: AdmissionPolicy = AlwaysAdmitPolicy(),
         similarity_evaluator: SimilarityEvaluator = StringComparisonSimilarityEvaluator(),
         system_prompt: Optional[str] = None,
     ):
@@ -50,6 +55,10 @@ class VCacheConfig:
             vector_db: Vector database for storing and retrieving embeddings.
             embedding_metadata_storage: Storage for embedding metadata.
             eviction_policy: Policy for removing items from cache when full.
+            admission_policy: Policy for deciding whether a cache-miss item is
+                worth caching before it takes up a slot. Defaults to
+                `AlwaysAdmitPolicy`, which admits every miss (vCache's original
+                behavior).
             similarity_evaluator: Evaluator for determining similarity between prompts.
             system_prompt: Optional system prompt to use for all inferences.
         """
@@ -57,6 +66,7 @@ class VCacheConfig:
         self.embedding_engine = embedding_engine
         self.vector_db = vector_db
         self.eviction_policy = eviction_policy
+        self.admission_policy = admission_policy
         self.embedding_metadata_storage = embedding_metadata_storage
         self.similarity_evaluator = similarity_evaluator
         self.system_prompt = system_prompt

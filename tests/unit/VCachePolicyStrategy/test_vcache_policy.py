@@ -54,6 +54,7 @@ class TestVerifiedDecisionPolicy(unittest.TestCase):
         mock_config.embedding_metadata_storage = MagicMock()
         mock_config.vector_db = MagicMock()
         mock_config.eviction_policy = MagicMock()
+        mock_config.admission_policy = MagicMock()
 
         self.policy = VerifiedDecisionPolicy()
         self.policy.setup(mock_config)

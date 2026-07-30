@@ -153,6 +153,7 @@ class SigmoidProbabilityDecisionPolicy(VCachePolicy):
                 vector_db=config.vector_db,
             ),
             eviction_policy=config.eviction_policy,
+            admission_policy=config.admission_policy,
         )
 
         self.callback_queue = CallbackQueue(
