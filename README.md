@@ -66,6 +66,18 @@ print(response)
 ```
 
 
+### Docker
+
+A `Dockerfile` is provided for a fully reproducible environment (same dependency groups as CI):
+
+```bash
+docker build -t vcache .
+docker run --rm vcache                                   # runs unit tests (default CMD)
+docker run --rm vcache pytest tests/integration           # integration tests
+docker run --rm -e OPENAI_API_KEY vcache python benchmarks/benchmark.py
+```
+
+
 ## How vCache Works
 
 vCache intelligently detects when a new prompt is semantically equivalent to a cached one, and adapts its decision boundaries based on your accuracy requirements.
@@ -156,7 +168,7 @@ You can find complete working examples in the [`playground`](playground/) direct
 
 
 ### Eviction Policy
-vCache supports FIFO, LRU, MRU, and a custom SCU eviction policy. See the [Eviction Policy Documentation](vcache/vcache_core/cache/eviction_policy/README.md) for further details.
+vCache supports FIFO, LRU, MRU, Cost-Aware, ARC, and a custom SCU eviction policy. See the [Eviction Policy Documentation](vcache/vcache_core/cache/eviction_policy/README.md) for further details.
 
 
 
