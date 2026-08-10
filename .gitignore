@@ -8,6 +8,7 @@ __old/*
 *.pdf
 *.json
 benchmarks/data/large_scale/*.json
+benchmarks/your_datasets/*.json
 benchmarks/results/*
 temp/*
 *.log
