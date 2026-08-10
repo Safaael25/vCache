@@ -29,6 +29,8 @@ from .vcache_core import (
 # Concrete Embedding engines
 from .vcache_core.cache.embedding_engine import (
     BenchmarkEmbeddingEngine,
+    ConcurrentEmbeddingEngine,
+    EmbeddingExecutionMode,
     LangChainEmbeddingEngine,
     OpenAIEmbeddingEngine,
 )
@@ -113,6 +115,8 @@ __all__ = [
     "OpenAIEmbeddingEngine",
     "LangChainEmbeddingEngine",
     "BenchmarkEmbeddingEngine",
+    "ConcurrentEmbeddingEngine",
+    "EmbeddingExecutionMode",
     # Concrete Vector databases
     "FAISSVectorDB",
     "HNSWLibVectorDB",

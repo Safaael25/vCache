@@ -1,3 +1,7 @@
+from vcache.vcache_core.cache.embedding_engine.concurrent_embedding_engine import (
+    ConcurrentEmbeddingEngine,
+    EmbeddingExecutionMode,
+)
 from vcache.vcache_core.cache.embedding_engine.embedding_engine import EmbeddingEngine
 from vcache.vcache_core.cache.embedding_engine.strategies.benchmark import (
     BenchmarkEmbeddingEngine,
@@ -14,4 +18,6 @@ __all__ = [
     "OpenAIEmbeddingEngine",
     "LangChainEmbeddingEngine",
     "BenchmarkEmbeddingEngine",
+    "ConcurrentEmbeddingEngine",
+    "EmbeddingExecutionMode",
 ]

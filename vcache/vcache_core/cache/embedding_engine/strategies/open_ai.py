@@ -55,3 +55,26 @@ class OpenAIEmbeddingEngine(EmbeddingEngine):
             return response.data[0].embedding
         except Exception as e:
             raise Exception(f"Error getting embedding from OpenAI: {e}")
+
+    def get_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """
+        Get embeddings for a batch of texts using a single OpenAI API call.
+
+        The OpenAI embeddings endpoint natively accepts a list of inputs, so
+        batching multiple texts into one request amortizes network round-trip
+        latency across all of them. This engine is still I/O-bound and is
+        intentionally not eligible for process-based execution (see
+        `get_engine_factory` on the base class): the win here is fewer HTTP
+        requests, not multiprocessing.
+
+        Args:
+            texts: The texts to embed.
+
+        Returns:
+            A list of embedding vectors, one per input text, in the same order.
+        """
+        try:
+            response = self.client.embeddings.create(input=texts, model=self.model_name)
+            return [item.embedding for item in response.data]
+        except Exception as e:
+            raise Exception(f"Error getting embeddings from OpenAI: {e}")
