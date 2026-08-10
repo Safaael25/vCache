@@ -3,6 +3,9 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
+from vcache.vcache_core.cache.eviction_policy.strategies.arc import (
+    ARCEvictionPolicy,
+)
 from vcache.vcache_core.cache.eviction_policy.strategies.cost_aware import (
     CostAwareEvictionPolicy,
 )
@@ -264,6 +267,111 @@ class TestEvictionPolicyStrategies(unittest.TestCase):
         )
         self.assertAlmostEqual(priority, 0.75 * 0.8 + 0.25 * (1 - 0.4))
 
+    def test_arc_evicts_stalest_when_all_items_unreferenced(self):
+        """With no items ever re-referenced (hit_count 0 for all), every
+        item lands in T1, so ARC should fall back to plain staleness
+        ordering -- the two oldest items, matching the LRU/FIFO baseline."""
+        policy = ARCEvictionPolicy(self.max_size, 0.9, self.eviction_percentage)
+        for meta in self.metadata:
+            meta.observations = []
+
+        victims = policy.select_victims(self.metadata)
+
+        self.assertEqual(len(victims), self.num_to_evict)
+        self.assertEqual(sorted(victims), [0, 1])
+
+    def test_arc_draws_victims_from_both_t1_and_t2(self):
+        """Items referenced at least once (hit_count >= 1) go to T2 and are
+        ordered by (hit_count, staleness) there; unreferenced items stay in
+        T1 ordered by staleness. Victims should be drawn from both lists
+        according to the adaptive split `p`, not just the stalest overall."""
+        policy = ARCEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, initial_p=0.5, p_step=0.1
+        )
+        # Items 0 and 1 have been referenced once (2 seed + 1 real
+        # observation) -> T2. Items 2, 3, 4 are unreferenced -> T1.
+        self.metadata[0].observations = [0, 0, 0]
+        self.metadata[1].observations = [0, 0, 0]
+        self.metadata[2].observations = []
+        self.metadata[3].observations = []
+        self.metadata[4].observations = []
+
+        victims = policy.select_victims(self.metadata)
+
+        # p starts at 0.5 and drops to 0.4 on this first call (no promotion
+        # signal yet), giving 1 victim from T1 (stalest: item 2) and 1 from
+        # T2 (stalest within T2: item 0, since both have equal hit_count).
+        self.assertEqual(len(victims), self.num_to_evict)
+        self.assertEqual(sorted(victims), [0, 2])
+
+    def test_arc_hit_count_subtracts_seed_observations(self):
+        """_hit_count should discount the 2 synthetic seed observations
+        every item starts with, and never go negative."""
+        meta = MagicMock()
+
+        meta.observations = [0, 0]
+        self.assertEqual(ARCEvictionPolicy._hit_count(meta), 0)
+
+        meta.observations = [0, 0, 0, 0, 0]
+        self.assertEqual(ARCEvictionPolicy._hit_count(meta), 3)
+
+        meta.observations = [0]
+        self.assertEqual(ARCEvictionPolicy._hit_count(meta), 0)
+
+    def test_arc_adapts_p_up_on_promotion(self):
+        """A T1 item from the previous round reappearing in T2 (promoted)
+        should push `p` up by `p_step`, mirroring a B1 ghost hit in
+        textbook ARC."""
+        policy = ARCEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, initial_p=0.5, p_step=0.1
+        )
+        policy._prev_t1_ids = {0, 1}
+
+        policy._adapt_p(t1=[], t2=[self.metadata[0]])
+
+        self.assertAlmostEqual(policy.p, 0.6)
+
+    def test_arc_adapts_p_down_without_promotion(self):
+        """No overlap between the previous round's T1 and the current T2
+        (no promotions) should push `p` down by `p_step`, mirroring a B2
+        ghost hit in textbook ARC."""
+        policy = ARCEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, initial_p=0.5, p_step=0.1
+        )
+        policy._prev_t1_ids = {0, 1}
+
+        policy._adapt_p(t1=[self.metadata[2]], t2=[self.metadata[3]])
+
+        self.assertAlmostEqual(policy.p, 0.4)
+
+    def test_arc_p_clamped_to_valid_range(self):
+        """`p` should never leave [0, 1] regardless of how many consecutive
+        promotion/no-promotion rounds occur."""
+        policy = ARCEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, initial_p=0.95, p_step=0.5
+        )
+        policy._prev_t1_ids = {0}
+        policy._adapt_p(t1=[], t2=[self.metadata[0]])  # promotion: p -> 1.0, clamped
+        self.assertEqual(policy.p, 1.0)
+
+        policy._prev_t1_ids = {0}
+        policy._adapt_p(t1=[self.metadata[1]], t2=[])  # no promotion: p -> 0.5
+        policy._adapt_p(t1=[self.metadata[1]], t2=[])  # no promotion: p -> 0.0, clamped
+        self.assertEqual(policy.p, 0.0)
+
+    def test_arc_invalid_params_default(self):
+        """Out-of-range initial_p or p_step should clamp to the documented
+        defaults (0.5 and 0.1) rather than producing an invalid policy."""
+        policy_bad_p = ARCEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, initial_p=-0.5
+        )
+        policy_bad_step = ARCEvictionPolicy(
+            self.max_size, 0.9, self.eviction_percentage, p_step=1.5
+        )
+
+        self.assertEqual(policy_bad_p.p, 0.5)
+        self.assertEqual(policy_bad_step.p_step, 0.1)
+
     def test_cost_aware_handles_negative_and_zero_cost(self):
         """Negative or zero costs (e.g. from a bad cost measurement) should
         not crash normalization or eviction -- they're unusual but valid
@@ -280,7 +388,6 @@ class TestEvictionPolicyStrategies(unittest.TestCase):
         victims = policy.select_victims(self.metadata)
 
         self.assertEqual(len(victims), self.num_to_evict)
-
 
 if __name__ == "__main__":
     unittest.main()
