@@ -52,6 +52,7 @@ from .vcache_core.cache.embedding_store.vector_db import (
 
 # Concrete Eviction policies
 from .vcache_core.cache.eviction_policy import (
+    ARCEvictionPolicy,
     CostAwareEvictionPolicy,
     FIFOEvictionPolicy,
     LRUEvictionPolicy,
@@ -130,6 +131,7 @@ __all__ = [
     "NoEvictionPolicy",
     "SCUEvictionPolicy",
     "CostAwareEvictionPolicy",
+    "ARCEvictionPolicy",
     # Concrete Embedding metadata storage
     "InMemoryEmbeddingMetadataStorage",
     "LangchainMetadataStorage",

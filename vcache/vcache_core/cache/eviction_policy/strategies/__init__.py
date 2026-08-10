@@ -1,3 +1,4 @@
+from vcache.vcache_core.cache.eviction_policy.strategies.arc import ARCEvictionPolicy
 from vcache.vcache_core.cache.eviction_policy.strategies.cost_aware import (
     CostAwareEvictionPolicy,
 )
@@ -16,4 +17,5 @@ __all__ = [
     "NoEvictionPolicy",
     "SCUEvictionPolicy",
     "CostAwareEvictionPolicy",
+    "ARCEvictionPolicy",
 ]
