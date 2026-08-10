@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  push:
+    branches: ["main", "master"]
   pull_request:
 
 jobs:
@@ -64,7 +66,12 @@ jobs:
           key: venv-${{ hashFiles('**/poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --with dev
+        # --with benchmarks is required in addition to dev: the existing
+        # tests/integration/test_benchmark_smoke.py imports
+        # benchmarks/benchmark.py, which imports `datasets` and `torch` at
+        # module level. Those are only declared in the Poetry `benchmarks`
+        # group, so that test cannot even be collected without it.
+        run: poetry install --with dev,benchmarks
 
       - name: Run unit tests
         run: poetry run pytest tests/unit/**/*.py --import-mode=importlib
