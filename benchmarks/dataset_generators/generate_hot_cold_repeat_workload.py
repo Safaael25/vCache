@@ -2,7 +2,7 @@
 Builds a third, idealized "fully-repeated best-case" dataset: every cluster
 repeats at least twice, so no query is a structural one-off that can never
 hit under any policy. This removes the dilution that made overall hit rates
-low in cost_advantage_demo_200.json (Experiment 2) and workload_profile_arc.json
+low in cost_sensitive_retention_large.json (Experiment 2) and workload_profile_arc.json
 (Experiment 1) -- there, most requests genuinely never repeat, by design, to
 create eviction pressure. Here, eviction pressure instead comes entirely from
 CACHE CAPACITY and REPEAT SPACING, not from unrepeatable filler traffic --
@@ -22,7 +22,7 @@ Design (see conversation for the three decisions this resolves):
     15 "cold" clusters repeat exactly twice (the minimum for "fully
     repeated"). This is more realistic than uniform repetition and gives
     eviction policies something to actually differentiate on.
-  - Cost structure: reused from cost_advantage_demo_200.json's cheap/
+  - Cost structure: reused from cost_sensitive_retention_large.json's cheap/
     expensive split (same 40-94s / 0.3-2.2s ranges) so this dataset stays
     directly comparable to Experiment 2, and so CostAware has a real signal
     to act on -- with uniform cost, CostAware degenerates toward recency/
@@ -140,7 +140,7 @@ print(f"Cross-cluster cosine similarity: mean={np.mean(cross_cluster_sims):.4f},
 assert np.min(same_cluster_sims) > np.max(cross_cluster_sims)
 print(f"Repeat counts: {sorted(set(counts.values()))} -- min repeat = {min(counts.values())} (no one-offs)")
 
-out_path = os.path.join(os.path.dirname(__file__), "..", "your_datasets", "full_repeat_dataset.json")
+out_path = os.path.join(os.path.dirname(__file__), "..", "your_datasets", "hot_cold_repeat_workload.json")
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(dataset, f, indent=2)
 

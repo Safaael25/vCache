@@ -1,5 +1,5 @@
 """
-Builds cost_advantage_demo.json: a small, fully deterministic synthetic
+Builds cost_sensitive_retention.json: a small, fully deterministic synthetic
 workload designed to isolate the one property that distinguishes
 CostAwareEvictionPolicy from plain LRU: whether a policy protects
 expensive-to-regenerate items even when they are NOT the most recently or
@@ -133,7 +133,7 @@ assert np.min(same_cluster_sims) > np.max(cross_cluster_sims), (
     "like real semantic paraphrases."
 )
 
-out_path = os.path.join(os.path.dirname(__file__), "..", "your_datasets", "cost_advantage_demo.json")
+out_path = os.path.join(os.path.dirname(__file__), "..", "your_datasets", "cost_sensitive_retention.json")
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(dataset, f, indent=2)
 

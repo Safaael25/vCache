@@ -1,5 +1,5 @@
 """
-v2 of the fully-repeated best-case dataset. v1 (generate_full_repeat_dataset.py)
+v2 of the fully-repeated best-case dataset. v1 (generate_hot_cold_repeat_workload.py)
 spread every cluster's repeats across the ENTIRE 150-query timeline, which
 made even the gap between a hot cluster's own repeats (~21 queries) too wide
 for a 10-20 entry cache to survive against 30 competing clusters -- overall
@@ -145,7 +145,7 @@ def gaps_for(name):
 print(f"Hot-cluster gap example (HE1): {gaps_for('HE1')}")
 print(f"Cold-cluster gap example (CE1): {gaps_for('CE1')}")
 
-out_path = os.path.join(os.path.dirname(__file__), "..", "your_datasets", "full_repeat_dataset_v2.json")
+out_path = os.path.join(os.path.dirname(__file__), "..", "your_datasets", "hot_cold_repeat_workload_v2.json")
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(dataset, f, indent=2)
 

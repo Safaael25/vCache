@@ -127,7 +127,7 @@ print(f"Same-cluster cosine similarity: mean={np.mean(same_cluster_sims):.4f}, m
 print(f"Cross-cluster cosine similarity: mean={np.mean(cross_cluster_sims):.4f}, max={np.max(cross_cluster_sims):.4f}")
 assert np.min(same_cluster_sims) > np.max(cross_cluster_sims)
 
-out_path = os.path.join(os.path.dirname(__file__), "..", "your_datasets", "high_locality_dataset.json")
+out_path = os.path.join(os.path.dirname(__file__), "..", "your_datasets", "temporal_locality_workload.json")
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(dataset, f, indent=2)
 

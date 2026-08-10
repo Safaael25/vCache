@@ -1,5 +1,5 @@
 """
-Scaled-up version of generate_cost_advantage_demo.py: same fill -> churn ->
+Scaled-up version of generate_cost_sensitive_retention.py: same fill -> churn ->
 replay design, same principle (expensive items must survive churn from
 unrelated cheap items to be worth anything), but 200 queries over a larger
 40-cluster working set (10 expensive, 30 cheap) so that a cache-size sweep
@@ -164,7 +164,7 @@ assert np.min(same_cluster_sims) > np.max(cross_cluster_sims), (
     "like real semantic paraphrases."
 )
 
-out_path = os.path.join(os.path.dirname(__file__), "..", "your_datasets", "cost_advantage_demo_200.json")
+out_path = os.path.join(os.path.dirname(__file__), "..", "your_datasets", "cost_sensitive_retention_large.json")
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(dataset, f, indent=2)
 
