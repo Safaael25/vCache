@@ -21,3 +21,8 @@ bin/*
 !benchmarks/results/sample/
 !benchmarks/results/sample/*.json
 !benchmarks/results/sample/*.csv
+
+# Final Concurrent Embedding Evaluation data underlying the report
+!benchmarks/results/concurrent_embedding_final/
+!benchmarks/results/concurrent_embedding_final/*.csv
+!benchmarks/results/concurrent_embedding_final/*.md
