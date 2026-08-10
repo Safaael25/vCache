@@ -1,0 +1,14 @@
+.git
+.claude
+__pycache__
+**/__pycache__
+*.pyc
+.venv
+.pytest_cache
+.mypy_cache
+.ruff_cache
+benchmarks/results/*
+!benchmarks/results/sample/
+benchmarks/your_datasets/*_results/
+*.log
+*.egg-info
