@@ -1,0 +1,63 @@
+{
+  "dataset_name": "workload_profile_arc",
+  "description": "Workload structured for ARC's actual design goal (scan-resistant recency+frequency adaptation), not cost-vs-recency: warmup phase builds genuine repeat signal on 25 hot clusters interleaved with cold one-off background traffic, a contiguous 800-row scan burst (bigger than every tested cache size) tries to flush the hot set, then a recovery phase interleaves the remaining hot repeats with more cold traffic to measure whether each policy protected the hot set through the scan.",
+  "source_dataset": {
+    "huggingface_repo": "vCache/SemBenchmarkLmArena",
+    "file": "train.parquet",
+    "embedding_column": "emb_e5_large_v2",
+    "llm_response_column": "response_gpt-4o-mini"
+  },
+  "total_rows": 2800,
+  "phases": {
+    "warmup": {
+      "row_count": 1000,
+      "hot_rows": 300,
+      "cold_rows": 700
+    },
+    "scan": {
+      "row_count": 800,
+      "note": "contiguous, all unique, exceeds every tested cache size (50-500)"
+    },
+    "recovery": {
+      "row_count": 1000,
+      "hot_rows": 200,
+      "cold_rows": 800
+    }
+  },
+  "hot_clusters": {
+    "count": 25,
+    "avg_cost_sec": 22.16185497543086,
+    "cluster_ids": [
+      1665,
+      3308,
+      3165,
+      2700,
+      2244,
+      1759,
+      1029,
+      2598,
+      3191,
+      3372,
+      1822,
+      2379,
+      236,
+      2471,
+      1807,
+      1915,
+      3349,
+      1879,
+      1335,
+      3070,
+      2329,
+      411,
+      755,
+      1,
+      2625
+    ],
+    "reps_warmup": 12,
+    "reps_recovery": 8
+  },
+  "construction_method": {
+    "sampling_seed": 42
+  }
+}
